@@ -16,11 +16,13 @@ class App(tk.Tk):
         cfgsts = tk.BooleanVar(False)
         session = manager
         cfg_tree = etree.Element('Empty')
+        cfgfilepath = tk.StringVar()
         self.sharedData = {
             'connected': consts,
             'session_handler': session,
             'cfg_tree': cfg_tree,
-            'cfg_available': cfgsts
+            'cfg_available': cfgsts,
+            'cfgfilepath': cfgfilepath
             }
         
         # configure the root window
@@ -41,19 +43,20 @@ class FilesFrame(tk.Frame):
     def __init__(self, container):
         super().__init__(container)
         options = {'padx': 5, 'pady': 5}
+
         
         self.container = container
         self.connected = self.container.sharedData['connected']
         self.cfg_available = self.container.sharedData['cfg_available']
         self.session = self.container.sharedData['session_handler']
         self.cfg_tree = self.container.sharedData['cfg_tree']
-        
+        self.cfgfilepath = self.container.sharedData['cfgfilepath']
 ##        print(type(self.cfg_tree))
 ##        print(self.connected, type(self.connected))
         self.fileLabel = ttk.Label(self, text='Select file to save config')
         self.fileLabel.grid(column=0, row=0, **options, sticky=tk.W)
 
-        #save filepath entry
+        #save filepath
         self.svfilepath = tk.StringVar()
         self.save_filepathEntry = ttk.Entry(self, textvariable=self.svfilepath)
         self.save_filepathEntry.grid(column=1, row=0, **options, sticky=tk.W)
@@ -64,8 +67,7 @@ class FilesFrame(tk.Frame):
         self.selectsButton['command'] = self.select_s_clicked
         self.selectsButton.grid(column=2, row=0, **options, sticky=tk.W)
         self.selectsButton.config(state='enabled')
-
-        #Save file button
+        
         self.saveButton = ttk.Button(self, text='Save')
         self.saveButton['command'] = self.save_clicked
         self.saveButton.grid(column=0, row=1, **options, sticky=tk.W)
@@ -80,22 +82,38 @@ class FilesFrame(tk.Frame):
         self.load_filepathEntry.insert(0,'C:/Projects/config.xml')
         self.load_filepathEntry.config(state='disabled')
 
-        self.selectButton = ttk.Button(self, text='Select')
-        self.selectButton['command'] = self.select_clicked
-        self.selectButton.grid(column=2, row=2, **options, sticky=tk.W)
-        self.selectButton.config(state='enabled')
+        self.loadtoparseButton = ttk.Button(self, text='Select')
+        self.loadtoparseButton['command'] = self.loadtoparse_clicked
+        self.loadtoparseButton.grid(column=2, row=2, **options, sticky=tk.W)
+        self.loadtoparseButton.config(state='enabled')
+
+
         self.loadButton = ttk.Button(self, text='Load')
         self.loadButton['command'] = self.load_clicked
         self.loadButton.grid(column=0, row=3, **options, sticky=tk.W)
         self.loadButton.config(state='enabled')
 
+##        select and Load newcfg
+        self.fileLabel = ttk.Label(self, text='Select new config to upload')
+        self.fileLabel.grid(column=0, row=4, **options, sticky=tk.W)
+        self.load_cfgpathEntry = ttk.Entry(self, textvariable=self.cfgfilepath)
+        self.load_cfgpathEntry.grid(column=1, row=4, **options, sticky=tk.W)
+        self.load_cfgpathEntry.insert(0,'C:/Projects/new_config_2send.xml')
+
+        self.loadcfgButton = ttk.Button(self, text='Select')
+        self.loadcfgButton['command'] = self.loadcfg_clicked
+        self.loadcfgButton.grid(column=2, row=4, **options, sticky=tk.W)
+        self.loadcfgButton.config(state='enabled')
 
 ##        Callbacks
         self.connected.trace_add('write', self.connected_callback)
         self.cfg_available.trace_add('write', self.cfg_callback)
-        
-    def select_clicked(self):
+    
+    def loadtoparse_clicked(self):
         self.ldfilepath.set(self.select_files())
+
+    def loadcfg_clicked(self):
+        self.cfgfilepath.set(self.select_files())
 
 
     def load_clicked(self):
@@ -113,7 +131,7 @@ class FilesFrame(tk.Frame):
         self.cfg_tree = self.container.cfg_tree
         ltree = etree.ElementTree(self.cfg_tree)
         ltree.write(savepath, pretty_print=True)
-        
+
     def connected_callback(self, *args):
 ##        self.saveButton.config(state='enabled')
 ##        self.save_filepathEntry.config(state='enabled')
@@ -127,16 +145,12 @@ class FilesFrame(tk.Frame):
         filetypes = (
             ('xml files', '*.xml'),
             ('text files', '*.txt'),
-            ('All files', '*.*')
-        )
-
+            ('All files', '*.*'))
         filenames = fd.askopenfilename(
             title='Open files',
             initialdir='/',
             filetypes=filetypes)
         return filenames
-
-
 
         
 # Netconf session frame       
@@ -149,7 +163,7 @@ class ConnectFrame(tk.Frame):
         self.session = self.container.sharedData['session_handler']
         self.cfg_eltree = self.container.sharedData['cfg_tree']
         self.cfg_sts = self.container.sharedData['cfg_available']
-
+        self.cfgfilepath = self.container.sharedData['cfgfilepath']
         options = {'padx': 5, 'pady': 5}
         
         self.hostLabel = ttk.Label(self, text='Host')
@@ -207,6 +221,16 @@ class ConnectFrame(tk.Frame):
         self.showcfgButton['command'] = self.showcfg_clicked
         self.showcfgButton.grid(column=3, row=2, **options, sticky=tk.W)
 
+        #send_config button
+        self.sendButton = ttk.Button(self, text='send config', state='disabled')
+        self.sendButton['command'] = self.sendclicked
+        self.sendButton.grid(column=3, row=3, **options, sticky=tk.W)
+
+    def sendclicked(self):
+
+        # print(self.cfgfilepath.get())
+        send_config(self.session, self.cfgfilepath.get())
+
     def showcfg_clicked(self):
         TVwindow = treeViewWindow(data=self.container.cfg_tree)
         
@@ -218,14 +242,14 @@ class ConnectFrame(tk.Frame):
 
 
     def connected_action(self):
-        print(type(self.connected))
+        # print(type(self.connected))
         self.userEntry.config(state = 'disabled')
         self.pwdEntry.config(state = 'disabled')
         self.portEntry.config(state = 'disabled')
         self.userEntry.config(state = 'disabled')
         self.hostEntry.config(state = 'disabled')
         self.getcfgButton.config(state = 'enabled')
-        
+        self.sendButton.config(state = 'enabled')
         self.capabilitiesButton.config(state = 'enabled')
         self.connected.set(True)
         
